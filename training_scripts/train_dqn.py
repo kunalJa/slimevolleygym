@@ -19,6 +19,7 @@ env = gym.make("SlimeVolley-v0")
 env.seed(SEED)
 
 
+
 def get_action_from_policy(policy_weights, state, ε):
     if np.random.uniform() >= ε:
         i = np.argmax(np.matmul(policy_weights.T, state))
@@ -42,7 +43,7 @@ if __name__ == "__main__":
 
     while t < N_STEPS:
         state_current = env.reset()
-
+        w_π = w.copy()
         done = False
         while not done:
             action = get_action_from_policy(w_π, state_current, ε)
@@ -57,9 +58,12 @@ if __name__ == "__main__":
             loss = np.reshape(loss, (1,3))
             state_exp = np.reshape(state_exp, (12,1))
             gradient = np.matmul(state_exp, 𝛼 * loss)
-            clipped_gradient = np.clip(gradient, -10, 10)
+            # clipped_gradient = np.clip(gradient, -10, 10)
+            norm = np.linalg.norm(gradient)
+            if norm > 10:
+                gradient *= 10/norm
             w += gradient
-            print(w)
+
 
             t += 1
             if t % target_update_freq == 0:
@@ -71,8 +75,7 @@ if __name__ == "__main__":
             if t == N_STEPS:
                 break
 
-            env.render()
-
-
-
-    # update w with correct values (replay buffer)
+            if t % 3 == 0:
+                print(w.tolist())
+                print()
+                env.render()
