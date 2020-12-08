@@ -11,11 +11,12 @@ from torch.autograd import Variable
 
 import random
 import os
+import sys
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 SEED = 2020
-ɣ = 1
-MAX_EPISODES = 1000
+ɣ = 0.9
+MAX_EPISODES = 2000
 N_STEPS = 1000
 
 LR_BEGIN = 0.01
@@ -23,6 +24,7 @@ LR_END = 0.01
 
 EPS_BEGIN = 0.1
 EPS_END = 0.05
+
 
 class DQN():
     def __init__(self, state_dim, action_dim, hidden_dim=64, learning_rate=0.05):
@@ -52,6 +54,21 @@ class DQN():
         for param in self.model.parameters():
             print(param.data)
 
+    def save_model(self, DIR):
+        if not os.path.exists(DIR):
+            os.makedirs(DIR)
+        last_saved = len([name for name in os.listdir(DIR) if os.path.isfile(os.path.join(DIR, name))])
+        torch.save(self.model.state_dict(), f'{DIR}/torch_weights_{last_saved + 1}.pth')
+
+    def load_model(self, path):
+        proceed = 'y'
+        try:
+            self.model.load_state_dict(torch.load(f'{os.path.abspath(os.getcwd())}/{path}'))
+        except Exception as e:
+            print(e)
+            proceed = input(f'\nFailed to load model state from {path}\nDo you wish to proceed? [y/n] ')
+        return proceed
+
 
 class ReplayBuffer():
     def __init__(self, len):
@@ -67,28 +84,17 @@ class ReplayBuffer():
         q_values_next = model.predict(next_state)
 
         target = q_values.tolist()
-        target[action] = reward + ɣ*torch.max(q_values_next).item()
-
-        if done:
-            target[action] = reward
-            model.update(experience_state, target)
-            return
+        target[action] = reward
+        if not done:
+            target[action] += ɣ*torch.max(q_values_next).item()
 
         model.update(experience_state, target)
 
     def replay(self, size, state_next, model):
         length = len(self.replay_buffer)
-
-        if length < size:
-            batch = random.sample(list(self.replay_buffer), int(len(self.replay_buffer)/2))
-        else:
-            batch = random.sample(list(self.replay_buffer), size)
-
-        if len(batch) == 0:
-            self.update(self.replay_buffer[-1], state_next, model)
-        else:
-            for obs in batch:
-                self.update(obs, state_next, model)
+        batch = random.sample(list(self.replay_buffer), min(length, size))
+        for obs in batch:
+            self.update(obs, state_next, model)
 
     def clear(self):
         self.replay_buffer.clear()
@@ -110,6 +116,7 @@ def get_action_from_policy(model, state, t):
 
 env = gym.make("CartPole-v1")
 env.seed(SEED)
+random.seed(SEED)
 
 
 if __name__ == "__main__":
@@ -121,48 +128,43 @@ if __name__ == "__main__":
 
     model = DQN(env.observation_space.shape[0], env.action_space.n, 50, 0.001)
 
-    for episode in range(MAX_EPISODES):
-        current_state = env.reset()
+    proceed = 'y'
+    if len(sys.argv) > 2 and sys.argv[1] == 'load':
+        proceed = model.load_model(sys.argv[2])
 
-        total_reward = 0
-        done = False
+    if proceed == 'y':
+        try:
+            for episode in range(MAX_EPISODES):
+                current_state = env.reset()
 
-        # replay_buffer.clear()
-        while not done:            
-            action = get_action_from_policy(model, current_state, t)
+                total_reward = 0
+                done = False
 
-            next_state, reward, done, info = env.step(action)
+                while not done:
+                    action = get_action_from_policy(model, current_state, t)
 
-            replay_buffer.push(current_state, reward, done, info)
-            replay_buffer.replay(20, next_state, model)
+                    next_state, reward, done, info = env.step(action)
 
+                    replay_buffer.push(current_state, reward, done, info)
+                    replay_buffer.replay(1, next_state, model)
 
-            # replay_buffer.append(current_state)
-            # replay_state = replay_buffer[np.random.randint(0, high=len(replay_buffer))]
+                    current_state = next_state
+                    total_reward += reward
 
-            # q_values = model.predict(current_state)
-            # q_values_next = model.predict(next_state)
+                    t += 1
+                    env.render()
 
-            # target = q_values.tolist()
-            # target[action] = reward + ɣ*torch.max(q_values_next).item()
+                print("Episode number: " + str(episode) + "; Total Reward: " + str(total_reward) + "; t: " + str(t))
+                plot_rewards.append(total_reward)
+                plot_episodes.append(episode)
 
-            # if done:
-            #     target[action] = reward
-            #     model.update(current_state, target)
-            #     break
+            model.save_model(f'{os.path.abspath(os.path.dirname(__file__))}/../zoo/dqn')
 
-            # model.update(current_state, target)
+        except KeyboardInterrupt:
+            save = input(f'\nDo you want to save this model? [y/n] ')
+            if save == 'y':
+                model.save_model(f'{os.path.abspath(os.path.dirname(__file__))}/../zoo/dqn')
 
-            current_state = next_state
-            total_reward += reward
-
-            t += 1
-            env.render()
-
-        print("Episode number: " + str(episode) + "; Total Reward: " + str(total_reward) + "; t: " + str(t))
-        plot_rewards.append(total_reward)
-        plot_episodes.append(episode)
-
-    env.close()
-    plt.plot(plot_episodes, plot_rewards)
-    plt.show()
+        env.close()
+        plt.plot(plot_episodes, plot_rewards)
+        plt.show()
