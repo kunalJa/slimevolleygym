@@ -548,7 +548,7 @@ class Game:
     self.ground = Wall(0, 0.75, REF_W, REF_U, c=GROUND_COLOR)
     self.fence = Wall(0, 0.75 + REF_WALL_HEIGHT/2, REF_WALL_WIDTH, (REF_WALL_HEIGHT-1.5), c=FENCE_COLOR)
     self.fenceStub = Particle(0, REF_WALL_HEIGHT, 0, 0, REF_WALL_WIDTH/2, c=FENCE_COLOR);
-    ball_vx = self.np_random.uniform(low=-20, high=20)
+    ball_vx = self.np_random.uniform(low=5, high=20)
     ball_vy = self.np_random.uniform(low=10, high=25)
     self.ball = Particle(0, REF_W/4, ball_vx, ball_vy, 0.5, c=BALL_COLOR);
     self.agent_left = Agent(-1, -REF_W/4, 1.5, c=AGENT_LEFT_COLOR)
@@ -877,6 +877,9 @@ class SlimeVolleyEnv(gym.Env):
 class SlimeVolleyPixelEnv(SlimeVolleyEnv):
   from_pixels = True
 
+class SlimeVolleyRandom(SlimeVolleyEnv):
+  game.ball_vx = 5
+
 class SlimeVolleyAtariEnv(SlimeVolleyEnv):
   from_pixels = True
   atari_mode = True
@@ -1017,6 +1020,11 @@ register(
     entry_point='slimevolleygym.slimevolley:SlimeVolleySurvivalAtariEnv'
 )
 
+register(
+    id='SlimeVolleyRandom-v0',
+    entry_point='slimevolleygym.slimevolley:SlimeVolleyRandom'
+)
+
 if __name__=="__main__":
   """
   Example of how to use Gym env, in single or multiplayer setting
@@ -1063,7 +1071,7 @@ if __name__=="__main__":
     if k == key.A:     otherManualAction[1] = 0
     if k == key.W:     otherManualAction[2] = 0
 
-  policy = BaselinePolicy() # defaults to use RNN Baseline for player
+  t = BaselinePolicy() # defaults to use RNN Baseline for player
 
   env = SlimeVolleyEnv()
   env.seed(np.random.randint(0, 10000))
