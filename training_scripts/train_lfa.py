@@ -5,27 +5,27 @@ import matplotlib.pyplot as plt
 from collections import deque
 import random
 
-ɣ = 1
+ɣ = 0.99
 target_update_freq = 1
 N_STEPS = 10000
 
-MAX_EPISODES = 1000
+MAX_EPISODES = 100
 
 SEED = 2020
-LR_BEGIN = 0.01
-LR_END = 0.01
+LR_BEGIN = 0.005
+LR_END = 0.005
 
-EPS_BEGIN = 0.1
+EPS_BEGIN = 1
 EPS_END = 0.05
 
-# env = gym.make("CartPole-v1")
-env = gym.make("MountainCar-v0")
+env = gym.make("CartPole-v1")
+# env = gym.make("MountainCar-v0")
 
 env.seed(SEED)
 
 # action_space = {0: [1,0,0], 1: [0,1,0], 2: [0,0,1],
 #                 3: [1,0,1], 4: [0,1,1], 5: [0,0,0]}
-                
+
 def get_action_from_policy(policy_weights, state, ε):
     if t <= N_STEPS:
         ε = EPS_BEGIN - t*(EPS_BEGIN - EPS_END)/N_STEPS
@@ -40,7 +40,7 @@ def get_action_from_policy(policy_weights, state, ε):
     if np.random.uniform() >= ε:
         i = np.argmax(np.matmul(policy_weights.T, state))
     else:
-        i = np.random.randint(0,3)
+        i = np.random.randint(0,2)
     out = i
     return out
 
@@ -58,7 +58,7 @@ class ReplayBuffer():
         q_values = np.matmul(w.T, state)
         q_values_next = np.matmul(w_target.T, state_next)
 
-        state = np.reshape(state, (2,1))
+        state = np.reshape(state, (4,1))
 
         target = q_values.copy()
         if not done:
@@ -67,7 +67,7 @@ class ReplayBuffer():
             target[action] = reward
 
         loss = target - q_values
-        loss = np.reshape(loss, (1, 3))
+        loss = np.reshape(loss, (1, 2))
         gradient = 𝛼 * np.matmul(state, loss)
 
         norm = np.linalg.norm(gradient)
@@ -80,6 +80,8 @@ class ReplayBuffer():
         length = len(self.replay_buffer)
         if length < size:
             batch = random.sample(list(self.replay_buffer), (len(self.replay_buffer) + 1)//2)
+        elif size == 1:
+            batch = [self.replay_buffer[-1]]
         else:
             batch = random.sample(list(self.replay_buffer), size)
 
@@ -95,8 +97,12 @@ class ReplayBuffer():
 
 
 if __name__ == "__main__":
-    w = np.zeros((2,3))
-    w_target = np.zeros((2,3))
+    # w = np.zeros((4,2))
+    w = np.array([[-2.185, -2.165],
+ [-0.323, -0.333],
+ [ 0.113,  0.382],
+ [-0.059,  0.098]])
+    w_target = np.zeros((4,2))
     t = 0
     𝛼 = LR_BEGIN
     ε = EPS_BEGIN
@@ -116,8 +122,8 @@ if __name__ == "__main__":
             action = get_action_from_policy(w, state_current, ε)
             state_next, reward, done, info = env.step(action)
 
-            replay_buffer.push(state_current, action, state_next, reward, done)
-            w = replay_buffer.replay(20, w, w_target)
+            # replay_buffer.push(state_current, action, state_next, reward, done)
+            # w = replay_buffer.replay(20, w, w_target)
 
             state_current = state_next
             total_reward += reward
@@ -132,5 +138,10 @@ if __name__ == "__main__":
         plot_episodes.append(episode)
 
     env.close()
+    print(w)
+    print("Average reward: ", np.mean(plot_rewards))
     plt.plot(plot_episodes, plot_rewards)
+    plt.title("LFA with target Q, experience replay, batch stochastic updating")
+    plt.xlabel("Episodes")
+    plt.ylabel("Reward")
     plt.show()
